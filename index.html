@@ -1,6 +1,3 @@
-Here is the complete, single code block with all features (custom coordinates, drag & drop fix, and upload fix) integrated.
-
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,10 +10,7 @@ Here is the complete, single code block with all features (custom coordinates, d
     <style>
         #map { height: 100vh; width: 100%; z-index: 1; }
         .route-arrow { background: transparent !important; border: none !important; }
-        
-        /* Dragover style - applied by JS when dragging */
         .dragover { background-color: #e0f2fe !important; border: 2px dashed #0284c7 !important; }
-        
         #overlay-loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; align-items: center; justify-content: center; flex-direction: column; color: white; }
         #overlay-initial { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 999; display: flex; align-items: center; justify-content: center; }
         .hidden { display: none !important; }
@@ -24,12 +18,6 @@ Here is the complete, single code block with all features (custom coordinates, d
         
         .coord-input { transition: all 0.2s; }
         .coord-input:focus { ring-width: 2px; ring-color: #2563eb; border-color: #2563eb; }
-
-        /* Screen Reader Only: Hides the input visually but keeps it interactive for the browser */
-        .sr-only {
-            position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-            overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0;
-        }
     </style>
 </head>
 <body>
@@ -52,18 +40,19 @@ Here is the complete, single code block with all features (custom coordinates, d
                                class="coord-input w-full p-2 border border-gray-300 rounded text-sm focus:outline-none">
                     </div>
                 </div>
-                <p class="text-[10px] text-gray-400 mt-2">
-                    Leave blank to auto-detect start from OSM data.
-                </p>
             </div>
 
-            <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition group relative">
-                <p class="text-lg mb-2 group-hover:text-blue-600 transition-colors pointer-events-none">📂 Drag & Drop OSM File Here</p>
-                <p class="text-sm text-gray-500 pointer-events-none">or</p>
+            <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center transition group hover:border-blue-500">
+                <p class="text-lg mb-2 text-gray-700 pointer-events-none">📂 Drag & Drop OSM File Here</p>
+                <p class="text-sm text-gray-500 mb-4 pointer-events-none">or</p>
                 
-                <input type="file" id="fileInput" accept=".osm,.xml" class="sr-only" onchange="handleFileUpload(event)">
+                <input type="file" id="fileInput" accept=".osm,.xml" style="display:none" onchange="handleFileUpload(event)">
                 
-                <label for="fileInput" class="inline-block mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer transition relative z-10">Browse Files</label>
+                <button type="button" 
+                        onclick="document.getElementById('fileInput').click()" 
+                        class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition shadow-md font-medium">
+                    Select File
+                </button>
             </div>
         </div>
     </div>
@@ -98,7 +87,7 @@ Here is the complete, single code block with all features (custom coordinates, d
             const dropZone = document.getElementById('dropZone');
             const fileInput = document.getElementById('fileInput');
 
-            // 1. Prevent default browser behavior (opening the file)
+            // Prevent default browser behavior
             ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
                 dropZone.addEventListener(eventName, (e) => {
                     e.preventDefault();
@@ -106,7 +95,7 @@ Here is the complete, single code block with all features (custom coordinates, d
                 }, false);
             });
 
-            // 2. Add visual highlight effect
+            // Highlight effect
             ['dragenter', 'dragover'].forEach(eventName => {
                 dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
             });
@@ -115,14 +104,14 @@ Here is the complete, single code block with all features (custom coordinates, d
                 dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
             });
 
-            // 3. Handle the Drop and forward to existing logic
+            // Handle Drop
             dropZone.addEventListener('drop', (e) => {
                 const dt = e.dataTransfer;
                 const files = dt.files;
 
                 if (files.length > 0) {
-                    // Manually assign files to input and trigger the change event
                     fileInput.files = files;
+                    // Trigger the change event for the app logic
                     const event = new Event('change');
                     fileInput.dispatchEvent(event);
                 }
@@ -131,6 +120,4 @@ Here is the complete, single code block with all features (custom coordinates, d
     </script>
 </body>
 </html>
-
-```
 
