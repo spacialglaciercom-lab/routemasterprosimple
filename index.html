@@ -15,20 +15,41 @@
         #overlay-initial { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 999; display: flex; align-items: center; justify-content: center; }
         .hidden { display: none !important; }
         #floating-actions { position: fixed; bottom: 20px; right: 20px; z-index: 100; }
+        
+        /* New Style for Coordinate Inputs */
+        .coord-input { transition: all 0.2s; }
+        .coord-input:focus { ring-width: 2px; ring-color: #2563eb; border-color: #2563eb; }
     </style>
 </head>
 <body>
     <div id="map"></div>
     
     <div id="overlay-initial">
-        <div class="text-center p-8 bg-white rounded-lg shadow-xl max-w-md">
+        <div class="text-center p-8 bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
             <h1 class="text-3xl font-bold mb-4">RouteMaster PRO</h1>
             <p class="mb-6 text-gray-600">Upload an OSM XML file to generate an optimized route</p>
-            <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition">
-                <p class="text-lg mb-2">ðŸ“ Drag & Drop OSM File Here</p>
+            
+            <div class="mb-6 bg-slate-50 p-4 rounded-lg border border-slate-200 text-left">
+                <label class="block text-sm font-bold text-gray-700 mb-2">ðŸ“  Starting Point Coordinates (Optional)</label>
+                <div class="flex gap-3">
+                    <div class="w-1/2">
+                        <input type="number" id="startLat" step="any" placeholder="Latitude (e.g. 40.71)" 
+                               class="coord-input w-full p-2 border border-gray-300 rounded text-sm focus:outline-none">
+                    </div>
+                    <div class="w-1/2">
+                        <input type="number" id="startLon" step="any" placeholder="Longitude (e.g. -74.00)" 
+                               class="coord-input w-full p-2 border border-gray-300 rounded text-sm focus:outline-none">
+                    </div>
+                </div>
+                <p class="text-[10px] text-gray-400 mt-2">
+                    Leave blank to auto-detect start from OSM data.
+                </p>
+            </div>
+            <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition group">
+                <p class="text-lg mb-2 group-hover:text-blue-600 transition-colors">ðŸ“‚ Drag & Drop OSM File Here</p>
                 <p class="text-sm text-gray-500">or</p>
-                <input type="file" id="fileInput" accept=".osm,.xml" class="mt-4" onchange="handleFileUpload(event)">
-                <label for="fileInput" class="block mt-2 text-blue-600 cursor-pointer">Browse Files</label>
+                <input type="file" id="fileInput" accept=".osm,.xml" class="hidden" onchange="handleFileUpload(event)">
+                <label for="fileInput" class="inline-block mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer transition">Browse Files</label>
             </div>
         </div>
     </div>
@@ -50,12 +71,19 @@
                 </div>
             </div>
             <div class="flex gap-2">
-                <button onclick="downloadGPX()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Download GPX</button>
-                <button onclick="resetApp()" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">Reset</button>
+                <button onclick="downloadGPX()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium transition">Download GPX</button>
+                <button onclick="resetApp()" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm font-medium transition">Reset</button>
             </div>
         </div>
     </div>
     
     <script src="routemaster_app.js"></script>
+    
+    <script>
+        // Note: Update your 'routemaster_app.js' handleFileUpload function to read these new inputs:
+        // const lat = document.getElementById('startLat').value;
+        // const lon = document.getElementById('startLon').value;
+        // if(lat && lon) { console.log("Custom start:", lat, lon); }
+    </script>
 </body>
 </html>
