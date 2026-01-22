@@ -1,360 +1,885 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>RouteMaster PRO - OSM Route Generator (Offline)</title>
-
-<!-- Inlined Tailwind subset (only utilities used in this UI) -->
-<style>
-  :root{
-    --bg:#ffffff;--text:#0f172a;--muted:#64748b;--primary:#0ea5e9;--panel:#ffffff;
-    --shadow:0 10px 15px -3px rgba(0,0,0,.1),0 4px 6px -4px rgba(0,0,0,.1);
-    --border:#e5e7eb;--accent:#e0f2fe;--accent-border:#0284c7;
-    --success:#10b981;--warn:#f59e0b;--error:#ef4444;--idle:#94a3b8;
-  }
-  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue","Noto Sans",sans-serif}
-  #map{height:100vh;width:100%;z-index:1}
-  .hidden{display:none!important}
-  #overlay-initial,#overlay-loading{
-    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:999;
-  }
-  #overlay-initial{background:rgba(255,255,255,.95)}
-  #overlay-loading{background:rgba(0,0,0,.8);color:#fff;z-index:1000}
-  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow)}
-  .p-4{padding:1rem}.p-8{padding:2rem}.mb-2{margin-bottom:.5rem}.mb-4{margin-bottom:1rem}.mb-6{margin-bottom:1.5rem}
-  .max-w-md{max-width:28rem}.text-center{text-align:center}.text-sm{font-size:.875rem}.text-lg{font-size:1.125rem}
-  .text-2xl{font-size:1.5rem}.text-3xl{font-size:1.875rem}.font-bold{font-weight:700}
-  .text-gray-600{color:#475569}.text-blue-600{color:#2563eb}
-  .border-2{border-width:2px}.border-dashed{border-style:dashed}.border-gray-300{border-color:#cbd5e1}
-  .rounded-lg{border-radius:.75rem}.shadow-lg{box-shadow:var(--shadow)}
-  .cursor-pointer{cursor:pointer}.hover\:border-blue-500:hover{border-color:#3b82f6}
-  .transition{transition:all .2s ease}
-  .flex{display:flex}.gap-2{gap:.5rem}.gap-4{gap:1rem}.items-center{align-items:center}
-  .bg-white{background:#fff}.bg-blue-600{background:#2563eb}.bg-gray-600{background:#475569}
-  .text-white{color:#fff}.rounded{border-radius:.5rem}
-  .hover\:bg-blue-700:hover{background:#1d4ed8}.hover\:bg-gray-700:hover{background:#334155}
-  .text-\[10px\]{font-size:10px}.uppercase{text-transform:uppercase}.ml-2{margin-left:.5rem}
-  .relative{position:relative}.inline-flex{display:inline-flex}.rounded-full{border-radius:9999px}.h-3{height:.75rem}.w-3{width:.75rem}
-  .bg-slate-400{background:#94a3b8}
-  #floating-actions{position:fixed;right:20px;bottom:20px;z-index:100}
-  #dropZone{border:2px dashed #cbd5e1;border-radius:10px;padding:2rem;text-align:center;cursor:pointer;transition:border-color .2s ease}
-  #dropZone.dragover{background:var(--accent);border-color:var(--accent-border)}
-</style>
-
-<!-- Leaflet CSS (1.9.4) inlined below by the PowerShell script -->
-<style id="leaflet-css">
-/* [INLINE_LEAFLET_CSS] */
-</style>
-
-<!-- Inline Leaflet marker icons as data URIs so no external images are needed -->
-<style>
-  .leaflet-container .leaflet-marker-icon,
-  .leaflet-container .leaflet-marker-shadow { image-rendering:auto; }
-  .leaflet-default-icon { 
-    background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABkAAAAtCAYAAACh8p0TAAA...truncated"); /* marker-icon.png base64 */
-    width:25px;height:41px;display:block;
-  }
-  .leaflet-default-icon-2x { 
-    background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAABMCAYAAAB...truncated"); /* marker-icon-2x.png base64 */
-    width:50px;height:82px;display:block;
-  }
-  .leaflet-default-shadow {
-    background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACq...truncated"); /* marker-shadow.png base64 */
-    width:41px;height:41px;display:block;
-  }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RouteMaster ONE | Waste Collection Router</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        :root {
+            --primary: #2563eb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --dark: #0f172a;
+            --gray-100: #f1f5f9;
+            --gray-200: #e2e8f0;
+            --gray-300: #cbd5e1;
+            --gray-600: #475569;
+            --gray-700: #334155;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: var(--gray-100);
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--dark) 0%, #1e293b 100%);
+            color: white;
+            padding: 1rem 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.25rem;
+            font-weight: 800;
+        }
+        
+        .stats {
+            background: white;
+            padding: 1rem 1.5rem;
+            display: flex;
+            gap: 2rem;
+            border-bottom: 1px solid var(--gray-200);
+        }
+        
+        .stat {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--gray-600);
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--dark);
+        }
+        
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        
+        #map {
+            flex: 1;
+            background: var(--gray-200);
+        }
+        
+        .controls {
+            background: white;
+            padding: 1rem 1.5rem;
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            border-top: 1px solid var(--gray-200);
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .btn {
+            padding: 0.625rem 1.25rem;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+        
+        .btn:hover:not(:disabled) {
+            background: var(--gray-100);
+            transform: translateY(-1px);
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        
+        .btn-success {
+            background: var(--success);
+            color: white;
+            border-color: var(--success);
+        }
+        
+        .btn-danger {
+            background: white;
+            color: var(--danger);
+            border-color: var(--danger);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        input[type="file"] { display: none; }
+        
+        .spacer { flex: 1; }
+        
+        footer {
+            background: var(--dark);
+            color: var(--success);
+            padding: 0.5rem 1.5rem;
+            font-family: monospace;
+            font-size: 0.8125rem;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        
+        .modal.active { display: flex; }
+        
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 20px 25px rgba(0,0,0,0.2);
+        }
+        
+        .modal-header {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: var(--dark);
+        }
+        
+        .setting {
+            margin-bottom: 1.5rem;
+        }
+        
+        .setting-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--gray-700);
+        }
+        
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            background: var(--gray-100);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+        
+        input[type="number"] {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--gray-300);
+            border-radius: 6px;
+            font-size: 0.875rem;
+        }
+        
+        .toggle {
+            position: relative;
+            width: 48px;
+            height: 24px;
+        }
+        
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--gray-300);
+            border-radius: 24px;
+            transition: 0.3s;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        
+        input:checked + .toggle-slider {
+            background: var(--primary);
+        }
+        
+        input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--dark);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            display: none;
+            z-index: 3000;
+        }
+        
+        .toast.show { display: block; }
+        
+        .loading {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+        }
+        
+        .loading.active { display: flex; }
+        
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid var(--gray-200);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-  <div id="map"></div>
-
-  <div id="overlay-initial">
-    <div class="text-center p-8 bg-white rounded-lg shadow-xl max-w-md panel">
-      <h1 class="text-3xl font-bold mb-4">RouteMaster PRO</h1>
-      <p class="mb-6 text-gray-600">Upload an OSM XML file to generate an optimized route</p>
-      <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition" role="button" tabindex="0" aria-label="Drop OSM file here or browse">
-        <p class="text-lg mb-2">📁 Drag & Drop OSM File Here</p>
-        <p class="text-sm text-gray-600">or</p>
-        <input type="file" id="fileInput" accept=".osm,.xml" class="mt-4" style="display:none">
-        <label for="fileInput" class="block mt-2 text-blue-600 cursor-pointer">Browse Files</label>
-      </div>
-    </div>
-  </div>
-
-  <div id="overlay-loading" class="hidden" aria-live="polite">
-    <div class="text-center">
-      <h2 id="loading-title" class="text-2xl font-bold mb-2">Processing...</h2>
-      <p id="loading-subtitle" class="text-lg">Please wait</p>
-    </div>
-  </div>
-
-  <div id="floating-actions" class="hidden">
-    <div class="bg-white rounded-lg shadow-lg p-4 panel">
-      <div class="flex items-center gap-4 mb-4">
-        <div>
-          <span id="status-dot" class="relative inline-flex rounded-full h-3 w-3 bg-slate-400"></span>
-          <span id="status-text" class="text-[10px] font-bold text-slate-600 uppercase ml-2">Idle</span>
+    <header>
+        <div class="logo">🚛 RouteMaster <span style="color:#2563eb">ONE</span></div>
+        <div style="font-size:0.75rem;opacity:0.7">v2.0</div>
+    </header>
+    
+    <div class="stats">
+        <div class="stat">
+            <div class="stat-label">Waypoints</div>
+            <div class="stat-value" id="stat-ways">0</div>
         </div>
-        <div class="text-sm">
-          <span id="stat-ways">0 Ways</span> | <span id="stat-dist">0.00 km</span>
+        <div class="stat">
+            <div class="stat-label">Nodes</div>
+            <div class="stat-value" id="stat-nodes">0</div>
         </div>
-      </div>
-      <div class="flex gap-2">
-        <button id="btnDownload" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Download GPX</button>
-        <button id="btnReset" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">Reset</button>
-      </div>
+        <div class="stat">
+            <div class="stat-label">Route Length</div>
+            <div class="stat-value"><span id="stat-dist">0.0</span> km</div>
+        </div>
     </div>
-  </div>
-
-  <!-- Leaflet JS (1.9.4) inlined below by the PowerShell script -->
-  <script id="leaflet-js">
-/* [INLINE_LEAFLET_JS] */
-  </script>
-
-  <!-- App logic -->
-  <script>
-  (function(){
-    'use strict';
-
-    // Initialize Leaflet map
-    let map, routeLayer;
-    function initMap(){
-      map = L.map('map', { zoomControl:true, preferCanvas:true }).setView([0,0], 2);
-
-      // OSM tiles (requires internet; swap to local tiles if you need full offline)
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap contributors'
-      }).addTo(map);
-
-      // Default icon (ensures no external image fetch)
-      const DefaultIcon = L.Icon.extend({
-        options: {
-          iconUrl: '', iconRetinaUrl: '', shadowUrl: '',
-          iconSize: [25,41], iconAnchor:[12,41], popupAnchor:[1,-34], tooltipAnchor:[16,-28], shadowSize:[41,41]
+    
+    <div class="main">
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+        </div>
+        <div id="map"></div>
+    </div>
+    
+    <div class="controls">
+        <label class="btn">
+            📁 Load OSM
+            <input type="file" id="file-input" accept=".osm,.xml">
+        </label>
+        
+        <button class="btn" id="btn-settings">⚙️ Settings</button>
+        
+        <div class="spacer"></div>
+        
+        <button class="btn btn-success" id="btn-download" disabled>⬇️ Download GPX</button>
+        <button class="btn btn-danger" id="btn-reset">🔄 Reset</button>
+    </div>
+    
+    <footer>
+        <span id="status">Ready • Awaiting OSM Data</span>
+    </footer>
+    
+    <div class="modal" id="modal-settings">
+        <div class="modal-content">
+            <div class="modal-header">Settings</div>
+            
+            <div class="setting">
+                <div class="setting-row">
+                    <label class="setting-label">Respect One-Ways</label>
+                    <label class="toggle">
+                        <input type="checkbox" id="set-oneway" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="setting">
+                <label class="setting-label">Start Point (Optional)</label>
+                <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem">
+                    <input type="number" id="start-lat" placeholder="Latitude" step="any">
+                    <input type="number" id="start-lon" placeholder="Longitude" step="any">
+                </div>
+                <small style="color:var(--gray-600)">💡 Click map to get coordinates</small>
+            </div>
+            
+            <button class="btn btn-primary" onclick="closeModal()" style="width:100%;margin-top:1rem">Close</button>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script>
+        // State
+        let map, nodes = new Map(), ways = [], circuit = [], layer = null, startMarker = null;
+        let graph = null;
+        
+        // Graph data structure for Eulerian routing
+        class Graph {
+            constructor() {
+                this.edges = new Map();
+                this.degreeIn = new Map();
+                this.degreeOut = new Map();
+            }
+            
+            addEdge(from, to, dist, wayId, isDeadHead = false) {
+                if (!this.edges.has(from)) {
+                    this.edges.set(from, []);
+                }
+                
+                this.edges.get(from).push({
+                    to: to,
+                    dist: dist,
+                    wayId: wayId,
+                    isDeadHead: isDeadHead,
+                    used: false
+                });
+                
+                this.degreeOut.set(from, (this.degreeOut.get(from) || 0) + 1);
+                this.degreeIn.set(to, (this.degreeIn.get(to) || 0) + 1);
+            }
+            
+            getUnbalanced() {
+                const sources = [];
+                const sinks = [];
+                
+                const allNodes = new Set([...this.degreeOut.keys(), ...this.degreeIn.keys()]);
+                
+                for (const node of allNodes) {
+                    const outDeg = this.degreeOut.get(node) || 0;
+                    const inDeg = this.degreeIn.get(node) || 0;
+                    const diff = outDeg - inDeg;
+                    
+                    if (diff > 0) {
+                        for (let i = 0; i < diff; i++) sinks.push(node);
+                    } else if (diff < 0) {
+                        for (let i = 0; i < -diff; i++) sources.push(node);
+                    }
+                }
+                
+                return { sources, sinks };
+            }
+            
+            reset() {
+                for (const edgeList of this.edges.values()) {
+                    for (const edge of edgeList) {
+                        edge.used = false;
+                    }
+                }
+            }
         }
-      });
-      L.Marker.prototype.options.icon = new DefaultIcon();
-
-      routeLayer = L.layerGroup().addTo(map);
-    }
-
-    // UI helpers
-    function setStatus(text, colorClass='bg-slate-400'){
-      const dot = document.getElementById('status-dot');
-      const t = document.getElementById('status-text');
-      if (dot) dot.className = `relative inline-flex rounded-full h-3 w-3 ${colorClass}`;
-      if (t) t.textContent = text;
-    }
-    function setStats(ways, km){
-      const w = document.getElementById('stat-ways');
-      const d = document.getElementById('stat-dist');
-      if (w) w.textContent = `${ways} Ways`;
-      if (d) d.textContent = `${km.toFixed(2)} km`;
-    }
-    function showInitialOverlay(show){
-      const el = document.getElementById('overlay-initial');
-      if (!el) return; el.classList.toggle('hidden', !show);
-    }
-    function showLoading(show, title='Processing...', subtitle='Please wait'){
-      const el = document.getElementById('overlay-loading');
-      if (!el) return;
-      document.getElementById('loading-title').textContent = title;
-      document.getElementById('loading-subtitle').textContent = subtitle;
-      el.classList.toggle('hidden', !show);
-    }
-    function showActions(show){
-      const el = document.getElementById('floating-actions');
-      if (!el) return; el.classList.toggle('hidden', !show);
-    }
-    function haversine(a, b){
-      const R=6371000;
-      const dLat=(b.lat-a.lat)*Math.PI/180;
-      const dLon=(b.lng-a.lng)*Math.PI/180;
-      const la1=a.lat*Math.PI/180, la2=b.lat*Math.PI/180;
-      const s=Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;
-      return 2*R*Math.asin(Math.sqrt(s));
-    }
-
-    // Ignore driveways/parking
-    function shouldIgnoreWay(tags){
-      if (!tags) return false;
-      const hwy=tags.highway, service=tags.service, amenity=tags.amenity, parking=tags.parking, access=tags.access, area=tags.area;
-      if (amenity==='parking') return true;
-      if (parking) return true;
-      if ((area==='yes'||area==='true') && amenity==='parking') return true;
-      if (hwy==='service'){
-        if (service==='driveway' || service==='parking_aisle' || service==='parking') return true;
-        if (access==='private') return true;
-      }
-      if (service==='driveway' || service==='parking_aisle') return true;
-      return false;
-    }
-
-    // Parse and render OSM XML text
-    function parseAndRenderOSM(xmlText){
-      const parser = new DOMParser();
-      const xml = parser.parseFromString(xmlText, 'application/xml');
-      if (xml.getElementsByTagName('parsererror').length){
-        throw new Error('OSM XML parse error');
-      }
-
-      const nodes = new Map(); // id -> LatLng
-      const nodeEls = xml.getElementsByTagName('node');
-      for (let i=0;i<nodeEls.length;i++){
-        const n=nodeEls[i];
-        const id=n.getAttribute('id');
-        const lat=parseFloat(n.getAttribute('lat'));
-        const lon=parseFloat(n.getAttribute('lon'));
-        if (!id || Number.isNaN(lat) || Number.isNaN(lon)) continue;
-        nodes.set(id, L.latLng(lat, lon));
-      }
-
-      const wayEls = xml.getElementsByTagName('way');
-      let waysCount=0, totalMeters=0;
-      routeLayer.clearLayers();
-      const bounds = L.latLngBounds();
-
-      for (let w=0; w<wayEls.length; w++){
-        const way = wayEls[w];
-
-        // Tags
-        const tags = {};
-        const tagEls = way.getElementsByTagName('tag');
-        for (let t=0; t<tagEls.length; t++){
-          const k = tagEls[t].getAttribute('k');
-          const v = tagEls[t].getAttribute('v');
-          if (k) tags[k] = v;
+        
+        // Haversine distance
+        function haversine(coord1, coord2) {
+            const R = 6371e3;
+            const toRad = Math.PI / 180;
+            const lat1 = coord1[0] * toRad;
+            const lat2 = coord2[0] * toRad;
+            const deltaLat = (coord2[0] - coord1[0]) * toRad;
+            const deltaLon = (coord2[1] - coord1[1]) * toRad;
+            
+            const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+                      Math.cos(lat1) * Math.cos(lat2) *
+                      Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
+            
+            return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         }
-
-        if (!tags.highway) continue;
-        if (shouldIgnoreWay(tags)) continue;
-
-        // Geometry
-        const latlngs = [];
-        const ndEls = way.getElementsByTagName('nd');
-        for (let n=0; n<ndEls.length; n++){
-          const ref = ndEls[n].getAttribute('ref');
-          const ll = ref ? nodes.get(ref) : undefined;
-          if (ll) latlngs.push(ll);
+        
+        // Dijkstra's shortest path
+        function dijkstra(graph, start, maxDist) {
+            const dist = new Map();
+            const prev = new Map();
+            const visited = new Set();
+            const queue = [{node: start, dist: 0}];
+            
+            dist.set(start, 0);
+            
+            while (queue.length > 0) {
+                queue.sort((a, b) => a.dist - b.dist);
+                const current = queue.shift();
+                
+                if (visited.has(current.node)) continue;
+                if (current.dist > maxDist) continue;
+                
+                visited.add(current.node);
+                
+                const edges = graph.edges.get(current.node);
+                if (!edges) continue;
+                
+                for (const edge of edges) {
+                    if (edge.isDeadHead) continue;
+                    
+                    const newDist = current.dist + edge.dist;
+                    
+                    if (newDist < (dist.get(edge.to) || Infinity)) {
+                        dist.set(edge.to, newDist);
+                        prev.set(edge.to, current.node);
+                        queue.push({node: edge.to, dist: newDist});
+                    }
+                }
+            }
+            
+            return { dist, prev };
         }
-        if (latlngs.length < 2) continue;
-
-        // Length
-        let length=0;
-        for (let i=1;i<latlngs.length;i++){
-          length += haversine(latlngs[i-1], latlngs[i]);
+        
+        // Balance graph with dead-head edges
+        function balanceGraph(maxDeadHead) {
+            const { sources, sinks } = graph.getUnbalanced();
+            
+            if (sources.length === 0) return;
+            
+            const used = new Set();
+            
+            for (const source of sources) {
+                const { dist, prev } = dijkstra(graph, source, maxDeadHead);
+                
+                let bestSink = null;
+                let bestDist = Infinity;
+                
+                for (const sink of sinks) {
+                    if (used.has(sink)) continue;
+                    
+                    const d = dist.get(sink);
+                    if (d !== undefined && d < bestDist && d <= maxDeadHead) {
+                        bestDist = d;
+                        bestSink = sink;
+                    }
+                }
+                
+                if (bestSink) {
+                    // Reconstruct path
+                    const path = [];
+                    let current = bestSink;
+                    while (current !== source) {
+                        path.unshift(current);
+                        current = prev.get(current);
+                        if (!current) break;
+                    }
+                    path.unshift(source);
+                    
+                    // Add dead-head edges along path
+                    for (let i = 0; i < path.length - 1; i++) {
+                        const from = path[i];
+                        const to = path[i + 1];
+                        const c1 = nodes.get(from);
+                        const c2 = nodes.get(to);
+                        if (c1 && c2) {
+                            graph.addEdge(from, to, haversine(c1, c2), 'deadhead', true);
+                        }
+                    }
+                    
+                    used.add(bestSink);
+                }
+            }
         }
-        totalMeters += length;
-
-        // Render
-        const line = L.polyline(latlngs, { color: '#0ea5e9', weight: 3, opacity: 0.95 });
-        line.addTo(routeLayer);
-        bounds.extend(line.getBounds());
-        waysCount++;
-      }
-
-      if (waysCount > 0){
-        map.fitBounds(bounds, { padding:[20,20] });
-      }
-
-      setStats(waysCount, totalMeters/1000);
-      setStatus(waysCount ? 'Ready':'No ways', waysCount ? 'bg-emerald-500':'bg-amber-500');
-      showActions(true);
-      showInitialOverlay(false);
-    }
-
-    // File handling and wiring
-    function handleFile(file){
-      setStatus('Loading...', 'bg-blue-500');
-      showLoading(true, 'Reading file...', 'Parsing OSM XML');
-      const reader = new FileReader();
-      reader.onerror = () => {
-        showLoading(false); setStatus('Read error','bg-rose-500'); alert('Failed to read file.');
-      };
-      reader.onload = () => {
-        try{
-          parseAndRenderOSM(String(reader.result));
-          showLoading(false);
-        }catch(err){
-          console.error(err);
-          showLoading(false);
-          setStatus('Parse error','bg-rose-500');
-          alert('Failed to parse OSM file. See console for details.');
+        
+        // Find Eulerian circuit using Hierholzer's algorithm
+        function findEulerianCircuit(startNode) {
+            graph.reset();
+            
+            const stack = [startNode];
+            const path = [];
+            
+            while (stack.length > 0) {
+                const current = stack[stack.length - 1];
+                const edges = graph.edges.get(current);
+                
+                let foundUnused = false;
+                if (edges) {
+                    for (const edge of edges) {
+                        if (!edge.used) {
+                            edge.used = true;
+                            stack.push(edge.to);
+                            foundUnused = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (!foundUnused) {
+                    path.push(stack.pop());
+                }
+            }
+            
+            return path.reverse();
         }
-      };
-      reader.readAsText(file);
-    }
-    function wireDrop(){
-      const dropZone = document.getElementById('dropZone');
-      const fileInput = document.getElementById('fileInput');
-      if (fileInput){
-        fileInput.addEventListener('change', (e)=>{
-          const f=e.target.files && e.target.files[0];
-          if (f) handleFile(f);
-        });
-      }
-      if (dropZone){
-        const prevent = (ev)=>{ ev.preventDefault(); ev.stopPropagation(); };
-        ['dragenter','dragover','dragleave','drop'].forEach(evt=>dropZone.addEventListener(evt,prevent,false));
-        dropZone.addEventListener('dragenter',()=>dropZone.classList.add('dragover'));
-        dropZone.addEventListener('dragover',()=>dropZone.classList.add('dragover'));
-        dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('dragover'));
-        dropZone.addEventListener('drop',(e)=>{
-          dropZone.classList.remove('dragover');
-          const files = e.dataTransfer && e.dataTransfer.files;
-          if (files && files.length) handleFile(files[0]);
-        });
-        dropZone.addEventListener('click',()=>fileInput && fileInput.click());
-        dropZone.addEventListener('keydown',(e)=>{
-          if (e.key==='Enter' || e.key===' '){ e.preventDefault(); fileInput && fileInput.click(); }
-        });
-      }
-      document.getElementById('btnDownload').addEventListener('click', downloadGPX);
-      document.getElementById('btnReset').addEventListener('click', resetApp);
-    }
-
-    function downloadGPX(){
-      const lines = [];
-      routeLayer.eachLayer((l)=>{ if (l instanceof L.Polyline) lines.push(l); });
-      if (!lines.length){ alert('No route to export.'); return; }
-      let gpx = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-      gpx += `<gpx version="1.1" creator="RouteMaster PRO" xmlns="http://www.topografix.com/GPX/1/1">\n`;
-      gpx += `  <trk>\n    <name>RouteMaster Export</name>\n`;
-      for (const line of lines){
-        const latlngs = line.getLatLngs();
-        gpx += `    <trkseg>\n`;
-        for (const ll of latlngs){
-          gpx += `      <trkpt lat="${ll.lat}" lon="${ll.lng}"></trkpt>\n`;
+        
+        // Initialize
+        window.onload = function() {
+            if (typeof L === 'undefined') {
+                status('ERROR: Map library failed to load');
+                return;
+            }
+            
+            map = L.map('map').setView([51.5, -0.1], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+            
+            map.on('click', function(e) {
+                const lat = e.latlng.lat.toFixed(6);
+                const lon = e.latlng.lng.toFixed(6);
+                L.popup()
+                    .setLatLng(e.latlng)
+                    .setContent('<div style="padding:0.5rem"><b>Coordinates</b><br>Lat: ' + lat + '<br>Lon: ' + lon + '<br><button onclick="useCoords(' + lat + ',' + lon + ')" style="margin-top:0.5rem;padding:0.5rem;background:#2563eb;color:white;border:none;border-radius:4px;cursor:pointer;width:100%">Use as Start</button></div>')
+                    .openOn(map);
+            });
+            
+            setupEvents();
+            status('Ready');
+        };
+        
+        window.useCoords = function(lat, lon) {
+            document.getElementById('start-lat').value = lat;
+            document.getElementById('start-lon').value = lon;
+            map.closePopup();
+            toast('✓ Start point set');
+        };
+        
+        function setupEvents() {
+            document.getElementById('file-input').onchange = function(e) {
+                if (e.target.files[0]) loadFile(e.target.files[0]);
+            };
+            
+            document.getElementById('btn-settings').onclick = function() {
+                document.getElementById('modal-settings').classList.add('active');
+            };
+            
+            document.getElementById('btn-download').onclick = downloadGPX;
+            
+            document.getElementById('btn-reset').onclick = function() {
+                if (layer) map.removeLayer(layer);
+                if (startMarker) map.removeLayer(startMarker);
+                nodes.clear();
+                ways = [];
+                circuit = [];
+                document.getElementById('stat-ways').textContent = '0';
+                document.getElementById('stat-nodes').textContent = '0';
+                document.getElementById('stat-dist').textContent = '0.0';
+                document.getElementById('btn-download').disabled = true;
+                document.getElementById('file-input').value = '';
+                toast('✓ Reset complete');
+            };
         }
-        gpx += `    </trkseg>\n`;
-      }
-      gpx += `  </trk>\n</gpx>\n`;
-      const blob = new Blob([gpx], {type:'application/gpx+xml'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'route.gpx';
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
-    }
-
-    function resetApp(){
-      routeLayer.clearLayers();
-      setStats(0,0);
-      setStatus('Idle','bg-slate-400');
-      showActions(false);
-      showInitialOverlay(true);
-      map.setView([0,0], 2);
-    }
-
-    window.addEventListener('DOMContentLoaded', ()=>{
-      initMap();
-      wireDrop();
-      setStatus('Idle','bg-slate-400');
-      setStats(0,0);
-      showActions(false);
-    });
-  })();
-  </script>
+        
+        function loadFile(file) {
+            loading(true);
+            status('Loading OSM file...');
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    parseOSM(e.target.result);
+                } catch(err) {
+                    toast('✗ Error: ' + err.message);
+                    status('Error loading file');
+                    loading(false);
+                }
+            };
+            reader.onerror = function() {
+                toast('✗ Failed to read file');
+                loading(false);
+            };
+            reader.readAsText(file);
+        }
+        
+        function parseOSM(xml) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(xml, 'text/xml');
+            
+            if (doc.querySelector('parsererror')) {
+                throw new Error('Invalid XML format');
+            }
+            
+            nodes.clear();
+            ways = [];
+            
+            // Parse nodes
+            doc.querySelectorAll('node').forEach(function(n) {
+                const id = n.getAttribute('id');
+                const lat = parseFloat(n.getAttribute('lat'));
+                const lon = parseFloat(n.getAttribute('lon'));
+                if (id && !isNaN(lat) && !isNaN(lon)) {
+                    nodes.set(id, [lat, lon]);
+                }
+            });
+            
+            // Parse ways
+            const allowed = ['residential', 'tertiary', 'secondary', 'primary', 'unclassified', 'service', 'living_street'];
+            const excluded = ['motorway', 'motorway_link', 'trunk', 'trunk_link'];
+            
+            doc.querySelectorAll('way').forEach(function(w) {
+                const tags = {};
+                w.querySelectorAll('tag').forEach(function(t) {
+                    tags[t.getAttribute('k')] = t.getAttribute('v');
+                });
+                
+                if (!tags.highway || excluded.includes(tags.highway) || !allowed.includes(tags.highway)) {
+                    return;
+                }
+                
+                const nodeIds = [];
+                w.querySelectorAll('nd').forEach(function(nd) {
+                    nodeIds.push(nd.getAttribute('ref'));
+                });
+                
+                if (nodeIds.length >= 2) {
+                    ways.push({
+                        id: w.getAttribute('id'),
+                        nodes: nodeIds,
+                        oneway: tags.oneway === 'yes'
+                    });
+                }
+            });
+            
+            if (ways.length === 0) {
+                throw new Error('No valid roads found');
+            }
+            
+            toast('✓ Loaded ' + ways.length + ' roads');
+            buildRoute();
+        }
+        
+        function buildRoute() {
+            status('Building graph...');
+            
+            const respectOneways = document.getElementById('set-oneway').checked;
+            
+            // Build graph
+            graph = new Graph();
+            
+            for (const way of ways) {
+                for (let i = 0; i < way.nodes.length - 1; i++) {
+                    const from = way.nodes[i];
+                    const to = way.nodes[i + 1];
+                    
+                    const c1 = nodes.get(from);
+                    const c2 = nodes.get(to);
+                    
+                    if (!c1 || !c2) continue;
+                    
+                    const dist = haversine(c1, c2);
+                    
+                    graph.addEdge(from, to, dist, way.id, false);
+                    
+                    if (!way.oneway || !respectOneways) {
+                        graph.addEdge(to, from, dist, way.id, false);
+                    }
+                }
+            }
+            
+            status('Balancing graph...');
+            
+            // Balance graph with dead-heading
+            const maxDeadHead = 100; // 100 meters
+            balanceGraph(maxDeadHead);
+            
+            status('Finding optimal circuit...');
+            
+            // Find start node
+            let startNode = null;
+            const startLat = parseFloat(document.getElementById('start-lat').value);
+            const startLon = parseFloat(document.getElementById('start-lon').value);
+            
+            if (!isNaN(startLat) && !isNaN(startLon)) {
+                // Find nearest node to custom start
+                let minDist = Infinity;
+                for (const [id, coord] of nodes.entries()) {
+                    const d = haversine([startLat, startLon], coord);
+                    if (d < minDist && d < 500) {
+                        minDist = d;
+                        startNode = id;
+                    }
+                }
+                
+                if (startNode && startMarker) {
+                    map.removeLayer(startMarker);
+                }
+                if (startNode) {
+                    startMarker = L.marker([startLat, startLon], {
+                        icon: L.divIcon({
+                            html: '<div style="background:#10b981;width:20px;height:20px;border-radius:50%;border:3px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3)"></div>',
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        })
+                    }).addTo(map);
+                }
+            }
+            
+            if (!startNode) {
+                startNode = graph.edges.keys().next().value;
+            }
+            
+            // Find Eulerian circuit
+            circuit = findEulerianCircuit(startNode);
+            
+            // Calculate stats
+            let totalDist = 0;
+            let deadHeadDist = 0;
+            
+            for (const edgeList of graph.edges.values()) {
+                for (const edge of edgeList) {
+                    if (edge.isDeadHead) {
+                        deadHeadDist += edge.dist;
+                    } else {
+                        totalDist += edge.dist;
+                    }
+                }
+            }
+            
+            // Update stats
+            document.getElementById('stat-ways').textContent = ways.length;
+            document.getElementById('stat-nodes').textContent = nodes.size;
+            document.getElementById('stat-dist').textContent = (totalDist / 1000).toFixed(2);
+            
+            // Render on map
+            if (layer) map.removeLayer(layer);
+            
+            const coords = [];
+            for (let i = 0; i < circuit.length; i++) {
+                const coord = nodes.get(circuit[i]);
+                if (coord) coords.push(coord);
+            }
+            
+            if (coords.length > 1) {
+                layer = L.polyline(coords, {
+                    color: '#2563eb',
+                    weight: 4,
+                    opacity: 0.8
+                }).addTo(map);
+                
+                map.fitBounds(layer.getBounds(), {padding: [50, 50]});
+            }
+            
+            document.getElementById('btn-download').disabled = false;
+            status('Ready • Optimized route with ' + circuit.length + ' waypoints');
+            loading(false);
+            toast('✓ Route optimized with Eulerian circuit');
+        }
+        
+        function downloadGPX() {
+            if (circuit.length === 0) {
+                toast('⚠ No route to export');
+                return;
+            }
+            
+            try {
+                let gpx = '<?xml version="1.0" encoding="UTF-8"?>\n';
+                gpx += '<gpx version="1.1" creator="RouteMaster ONE">\n';
+                gpx += '<trk><n>Route</n><trkseg>\n';
+                
+                for (let i = 0; i < circuit.length; i++) {
+                    const coord = nodes.get(circuit[i]);
+                    if (coord) {
+                        gpx += '<trkpt lat="' + coord[0] + '" lon="' + coord[1] + '"></trkpt>\n';
+                    }
+                }
+                
+                gpx += '</trkseg></trk>\n</gpx>';
+                
+                // Create download
+                const blob = new Blob([gpx], {type: 'application/gpx+xml'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'route_' + Date.now() + '.gpx';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                toast('✓ GPX downloaded');
+                status('GPX exported');
+            } catch(err) {
+                toast('✗ Download failed: ' + err.message);
+            }
+        }
+        
+        function closeModal() {
+            document.getElementById('modal-settings').classList.remove('active');
+        }
+        
+        function loading(show) {
+            document.getElementById('loading').classList.toggle('active', show);
+        }
+        
+        function toast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(function() {
+                t.classList.remove('show');
+            }, 3000);
+        }
+        
+        function status(msg) {
+            document.getElementById('status').textContent = msg;
+        }
+    </script>
 </body>
 </html>
