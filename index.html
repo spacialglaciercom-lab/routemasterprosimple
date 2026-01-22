@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RouteMaster PRO - OSM Route Generator</title>
+    <title>RouteMaster PRO CPP - OSM Route Generator</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -14,7 +14,6 @@
         #overlay-initial { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 999; display: flex; align-items: center; justify-content: center; }
         .hidden { display: none !important; }
         #floating-actions { position: fixed; bottom: 20px; right: 20px; z-index: 100; }
-        .coord-input:focus { ring-width: 2px; ring-color: #2563eb; border-color: #2563eb; }
     </style>
 </head>
 <body>
@@ -22,31 +21,14 @@
     
     <div id="overlay-initial">
         <div class="text-center p-8 bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <h1 class="text-3xl font-bold mb-4">RouteMaster PRO</h1>
-            <p class="mb-6 text-gray-600">Upload an OSM XML file to generate an optimized route</p>
+            <h1 class="text-3xl font-bold mb-4">RouteMaster PRO CPP</h1>
+            <p class="mb-6 text-gray-600">Upload OSM XML for Chinese Postman optimal route</p>
             
-            <div class="mb-6 bg-slate-50 p-4 rounded-lg border border-slate-200 text-left">
-                <label class="block text-sm font-bold text-gray-700 mb-2">📍 Starting Point Coordinates (Optional)</label>
-                <div class="flex gap-3">
-                    <div class="w-1/2">
-                        <input type="number" id="startLat" step="any" placeholder="Latitude (e.g. 45.32)" 
-                               class="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none">
-                    </div>
-                    <div class="w-1/2">
-                        <input type="number" id="startLon" step="any" placeholder="Longitude (e.g. -74.18)" 
-                               class="w-full p-2 border border-gray-300 rounded text-sm focus:outline-none">
-                    </div>
-                </div>
-            </div>
-
             <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center transition group hover:border-blue-500">
                 <p class="text-lg mb-2 text-gray-700 pointer-events-none">📂 Drag & Drop OSM File Here</p>
                 <p class="text-sm text-gray-500 mb-4 pointer-events-none">or</p>
-                
                 <input type="file" id="fileInput" accept=".osm,.xml" style="display:none">
-                
-                <button type="button" 
-                        onclick="document.getElementById('fileInput').click()" 
+                <button type="button" onclick="document.getElementById('fileInput').click()" 
                         class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition shadow-md font-medium">
                     Select File
                 </button>
@@ -56,7 +38,7 @@
     
     <div id="overlay-loading" class="hidden">
         <h2 id="loading-title" class="text-2xl font-bold mb-2">Processing...</h2>
-        <p id="loading-subtitle" class="text-lg">Please wait</p>
+        <p id="loading-subtitle" class="text-lg">Parsing OSM data</p>
     </div>
     
     <div id="floating-actions" class="hidden">
@@ -71,8 +53,8 @@
                 </div>
             </div>
             <div class="flex gap-2">
-                <button onclick="downloadGPX()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium transition">Download GPX</button>
-                <button onclick="resetApp()" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm font-medium transition">Reset</button>
+                <button onclick="downloadGPX()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium">Download GPX</button>
+                <button onclick="resetApp()" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm font-medium">Reset</button>
             </div>
         </div>
     </div>
@@ -81,8 +63,9 @@
         // Global variables
         let map = null;
         let routeLayer = null;
-        let osmData = null;
         let routePath = null;
+        let wayGraph = null;
+        let nodeMap = null;
 
         // Show loading overlay
         function showLoading(title = 'Processing...', subtitle = 'Please wait') {
@@ -108,46 +91,17 @@
             document.getElementById('stat-dist').textContent = `${distance.toFixed(2)} km`;
         }
 
-        // Parse OSM XML and extract ways
+        // Parse OSM XML
         function parseOSM(xmlText) {
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
             
             const ways = [];
             const wayElements = xmlDoc.getElementsByTagName('way');
-            
-            for (let way of wayElements) {
-                const tags = {};
-                const tagElements = way.getElementsByTagName('tag');
-                for (let tag of tagElements) {
-                    tags[tag.getAttribute('k')] = tag.getAttribute('v');
-                }
-                
-                // Only include highways (roads, paths, etc.)
-                if (tags.highway) {
-                    const nds = [];
-                    const ndElements = way.getElementsByTagName('nd');
-                    for (let nd of ndElements) {
-                        nds.push(nd.getAttribute('ref'));
-                    }
-                    
-                    if (nds.length > 0) {
-                        ways.push({ id: way.getAttribute('id'), nodes: nds, tags });
-                    }
-                }
-            }
-            
-            return ways;
-        }
-
-        // Get node coordinates from OSM XML
-        function getNodes(xmlText) {
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-            
-            const nodes = {};
             const nodeElements = xmlDoc.getElementsByTagName('node');
             
+            // Build node map
+            const nodes = {};
             for (let node of nodeElements) {
                 nodes[node.getAttribute('id')] = {
                     lat: parseFloat(node.getAttribute('lat')),
@@ -155,55 +109,361 @@
                 };
             }
             
-            return nodes;
-        }
-
-        // Generate route from ways and nodes
-        function generateRoute(ways, nodes) {
-            const routePoints = [];
-            
-            for (let way of ways) {
-                const wayPoints = [];
-                for (let nodeId of way.nodes) {
-                    if (nodes[nodeId]) {
-                        wayPoints.push([nodes[nodeId].lat, nodes[nodeId].lon]);
+            // Extract highway ways
+            for (let way of wayElements) {
+                const tags = {};
+                const tagElements = way.getElementsByTagName('tag');
+                for (let tag of tagElements) {
+                    tags[tag.getAttribute('k')] = tag.getAttribute('v');
+                }
+                
+                if (tags.highway) {
+                    const nds = [];
+                    const ndElements = way.getElementsByTagName('nd');
+                    for (let nd of ndElements) {
+                        nds.push(nd.getAttribute('ref'));
+                    }
+                    
+                    if (nds.length > 1) {
+                        ways.push({ id: way.getAttribute('id'), nodes: nds, tags });
                     }
                 }
-                if (wayPoints.length > 0) {
-                    routePoints.push(...wayPoints);
+            }
+            
+            return { ways, nodes };
+        }
+
+        // Create graph from OSM ways
+        function buildGraph(ways, nodes) {
+            const graph = new Map();
+            const adjacencyList = new Map();
+            
+            for (let way of ways) {
+                for (let i = 0; i < way.nodes.length - 1; i++) {
+                    const nodeA = way.nodes[i];
+                    const nodeB = way.nodes[i + 1];
+                    
+                    // Calculate distance
+                    const dist = haversineDistance(nodes[nodeA], nodes[nodeB]);
+                    
+                    // Add edges (bidirectional for undirected graph)
+                    addEdge(adjacencyList, nodeA, nodeB, dist);
+                    addEdge(adjacencyList, nodeB, nodeA, dist);
                 }
             }
             
-            // Simple optimization: remove consecutive duplicates
-            const optimized = routePoints.filter((point, index) => {
-                if (index === 0) return true;
-                const prev = routePoints[index - 1];
-                return !(point[0] === prev[0] && point[1] === prev[1]);
-            });
-            
-            return optimized;
+            return adjacencyList;
         }
 
-        // Calculate distance
-        function calculateDistance(points) {
-            if (points.length < 2) return 0;
+        function addEdge(graph, from, to, weight) {
+            if (!graph.has(from)) {
+                graph.set(from, new Map());
+            }
+            graph.get(from).set(to, weight);
+        }
+
+        // Haversine distance calculation
+        function haversineDistance(node1, node2) {
+            const R = 6371; // km
+            const lat1 = node1.lat * Math.PI / 180;
+            const lat2 = node2.lat * Math.PI / 180;
+            const dLat = (node2.lat - node1.lat) * Math.PI / 180;
+            const dLon = (node2.lon - node1.lon) * Math.PI / 180;
             
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1) * Math.cos(lat2) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            
+            return R * c;
+        }
+
+        // Calculate distance along path
+        function calculatePathDistance(points) {
             let total = 0;
             for (let i = 1; i < points.length; i++) {
-                const lat1 = points[i-1][0], lon1 = points[i-1][1];
-                const lat2 = points[i][0], lon2 = points[i][1];
-                
-                // Haversine formula (km)
-                const R = 6371;
-                const dLat = (lat2 - lat1) * Math.PI / 180;
-                const dLon = (lon2 - lon1) * Math.PI / 180;
-                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                          Math.sin(dLon/2) * Math.sin(dLon/2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                total += R * c;
+                total += haversineDistance(
+                    {lat: points[i-1][0], lon: points[i-1][1]},
+                    {lat: points[i][0], lon: points[i][1]}
+                );
             }
             return total;
+        }
+
+        // Get degree of each node
+        function getNodeDegrees(graph) {
+            const degrees = new Map();
+            
+            for (let [node, edges] of graph) {
+                degrees.set(node, (degrees.get(node) || 0) + edges.size);
+                
+                for (let neighbor of edges.keys()) {
+                    degrees.set(neighbor, (degrees.get(neighbor) || 0) + 1);
+                }
+            }
+            
+            return degrees;
+        }
+
+        // Find nodes with odd degree
+        function findOddDegreeNodes(graph) {
+            const degrees = getNodeDegrees(graph);
+            const oddNodes = [];
+            
+            for (let [node, degree] of degrees) {
+                if (degree % 2 !== 0) {
+                    oddNodes.push(node);
+                }
+            }
+            
+            return oddNodes;
+        }
+
+        // Dijkstra's shortest path algorithm
+        function dijkstra(graph, start, end) {
+            const distances = new Map();
+            const previous = new Map();
+            const visited = new Set();
+            const queue = [start];
+            
+            for (let node of graph.keys()) {
+                distances.set(node, Infinity);
+            }
+            distances.set(start, 0);
+            
+            while (queue.length > 0) {
+                queue.sort((a, b) => distances.get(a) - distances.get(b));
+                const current = queue.shift();
+                
+                if (current === end) {
+                    const path = [];
+                    let node = end;
+                    while (node !== start) {
+                        path.unshift(node);
+                        node = previous.get(node);
+                    }
+                    path.unshift(start);
+                    return { distance: distances.get(end), path };
+                }
+                
+                if (visited.has(current)) continue;
+                visited.add(current);
+                
+                const edges = graph.get(current);
+                if (!edges) continue;
+                
+                for (let [neighbor, weight] of edges) {
+                    if (!visited.has(neighbor)) {
+                        const alt = distances.get(current) + weight;
+                        if (alt < distances.get(neighbor)) {
+                            distances.set(neighbor, alt);
+                            previous.set(neighbor, current);
+                            queue.push(neighbor);
+                        }
+                    }
+                }
+            }
+            
+            return { distance: Infinity, path: [] };
+        }
+
+        // Find shortest paths between all pairs of odd nodes
+        function findShortestPathsBetweenOddNodes(graph, oddNodes) {
+            const pairs = [];
+            
+            for (let i = 0; i < oddNodes.length; i++) {
+                for (let j = i + 1; j < oddNodes.length; j++) {
+                    const nodeA = oddNodes[i];
+                    const nodeB = oddNodes[j];
+                    const { distance, path } = dijkstra(graph, nodeA, nodeB);
+                    
+                    if (distance !== Infinity) {
+                        pairs.push({
+                            nodes: [nodeA, nodeB],
+                            distance: distance,
+                            path: path
+                        });
+                    }
+                }
+            }
+            
+            return pairs;
+        }
+
+        // Hungarian algorithm approximation for minimum weight matching
+        function hungarianMatching(oddNodes, pairDistances) {
+            // Simplified greedy approach for browser compatibility
+            // For production, use a full Hungarian algorithm implementation
+            
+            const unmatched = [...oddNodes];
+            const matchedPairs = [];
+            const used = new Set();
+            
+            while (unmatched.length >= 2) {
+                let minDist = Infinity;
+                let bestPair = null;
+                
+                for (let i = 0; i < unmatched.length; i++) {
+                    for (let j = i + 1; j < unmatched.length; j++) {
+                        const nodeA = unmatched[i];
+                        const nodeB = unmatched[j];
+                        
+                        if (used.has(nodeA) || used.has(nodeB)) continue;
+                        
+                        const pair = pairDistances.find(p => 
+                            (p.nodes[0] === nodeA && p.nodes[1] === nodeB) ||
+                            (p.nodes[0] === nodeB && p.nodes[1] === nodeA)
+                        );
+                        
+                        if (pair && pair.distance < minDist) {
+                            minDist = pair.distance;
+                            bestPair = pair;
+                        }
+                    }
+                }
+                
+                if (!bestPair) break;
+                
+                matchedPairs.push(bestPair);
+                used.add(bestPair.nodes[0]);
+                used.add(bestPair.nodes[1]);
+                
+                // Remove matched nodes
+                unmatched.splice(unmatched.indexOf(bestPair.nodes[0]), 1);
+                unmatched.splice(unmatched.indexOf(bestPair.nodes[1]), 1);
+            }
+            
+            return matchedPairs;
+        }
+
+        // Create augmented graph with duplicate edges
+        function augmentGraph(graph, matchingPairs, nodes) {
+            const augmented = new Map();
+            
+            // Copy original graph
+            for (let [node, edges] of graph) {
+                augmented.set(node, new Map(edges));
+            }
+            
+            // Add duplicate edges from matching pairs
+            for (let pair of matchingPairs) {
+                if (pair.path.length < 2) continue;
+                
+                // Add edges for the shortest path between paired nodes
+                for (let i = 0; i < pair.path.length - 1; i++) {
+                    const from = pair.path[i];
+                    const to = pair.path[i + 1];
+                    
+                    if (!augmented.has(from)) {
+                        augmented.set(from, new Map());
+                    }
+                    
+                    const existingWeight = augmented.get(from).get(to) || 0;
+                    const weight = graph.get(from)?.get(to) || existingWeight || 0.001;
+                    
+                    // Increase weight (duplicate edge)
+                    augmented.get(from).set(to, existingWeight + weight);
+                }
+            }
+            
+            return augmented;
+        }
+
+        // Hierholzer's algorithm for Eulerian circuit
+        function findEulerianCircuit(graph, startNode) {
+            const circuit = [];
+            const stack = [startNode];
+            const adjacency = new Map();
+            
+            // Deep copy adjacency list
+            for (let [node, edges] of graph) {
+                adjacency.set(node, new Map(edges));
+            }
+            
+            while (stack.length > 0) {
+                const current = stack[stack.length - 1];
+                
+                if (adjacency.has(current) && adjacency.get(current).size > 0) {
+                    // Get next neighbor
+                    const neighbors = Array.from(adjacency.get(current).keys());
+                    const next = neighbors[0];
+                    
+                    // Remove edge
+                    adjacency.get(current).delete(next);
+                    if (adjacency.get(next)) {
+                        adjacency.get(next).delete(current);
+                    }
+                    
+                    stack.push(next);
+                } else {
+                    circuit.unshift(stack.pop());
+                }
+            }
+            
+            return circuit;
+        }
+
+        // Convert node path to coordinate path
+        function pathToCoordinates(nodePath, nodes) {
+            const coordinates = [];
+            
+            for (let nodeId of nodePath) {
+                if (nodes[nodeId]) {
+                    coordinates.push([nodes[nodeId].lat, nodes[nodeId].lon]);
+                }
+            }
+            
+            return coordinates;
+        }
+
+        // Main Chinese Postman algorithm
+        function chinesePostmanRoute(ways, nodes) {
+            showLoading('Building graph...', 'Processing OSM data');
+            
+            // Build graph from OSM ways
+            wayGraph = buildGraph(ways, nodes);
+            nodeMap = nodes;
+            
+            showLoading('Finding odd nodes...', 'Analyzing graph topology');
+            
+            // Find odd degree nodes
+            const oddNodes = findOddDegreeNodes(wayGraph);
+            
+            if (oddNodes.length === 0) {
+                // Graph is already Eulerian
+                const startNode = ways[0].nodes[0];
+                const circuit = findEulerianCircuit(wayGraph, startNode);
+                return pathToCoordinates(circuit, nodes);
+            }
+            
+            showLoading('Finding shortest paths...', `Processing ${oddNodes.length} odd nodes`);
+            
+            // Find shortest paths between all odd node pairs
+            const pairDistances = findShortestPathsBetweenOddNodes(wayGraph, oddNodes);
+            
+            if (pairDistances.length === 0) {
+                throw new Error('No paths found between odd nodes - graph may be disconnected');
+            }
+            
+            showLoading('Matching odd nodes...', 'Optimizing route pairs');
+            
+            // Find minimum weight matching
+            const matchingPairs = hungarianMatching(oddNodes, pairDistances);
+            
+            showLoading('Augmenting graph...', 'Creating Eulerian circuit');
+            
+            // Create augmented graph
+            const augmentedGraph = augmentGraph(wayGraph, matchingPairs, nodes);
+            
+            // Find Eulerian circuit
+            const startNode = oddNodes.length > 0 ? oddNodes[0] : ways[0].nodes[0];
+            const circuit = findEulerianCircuit(augmentedGraph, startNode);
+            
+            if (circuit.length < 2) {
+                throw new Error('Could not generate valid circuit');
+            }
+            
+            return pathToCoordinates(circuit, nodes);
         }
 
         // Process file upload
@@ -211,21 +471,25 @@
             if (!files || files.length === 0) return;
             
             const file = files[0];
-            showLoading('Loading OSM file...', 'Parsing data');
+            showLoading('Loading OSM file...', 'Reading data');
             
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
-                    updateStatus('Parsing', 'yellow');
                     const xmlText = e.target.result;
+                    const { ways, nodes } = parseOSM(xmlText);
                     
-                    // Parse OSM data
-                    const ways = parseOSM(xmlText);
-                    const nodes = getNodes(xmlText);
-                    const routePoints = generateRoute(ways, nodes);
+                    if (ways.length === 0) {
+                        throw new Error('No highway data found in OSM file');
+                    }
+                    
+                    updateStatus('Computing CPP', 'yellow');
+                    
+                    // Generate Chinese Postman route
+                    const routePoints = chinesePostmanRoute(ways, nodes);
                     
                     if (routePoints.length === 0) {
-                        throw new Error('No valid route data found in the file');
+                        throw new Error('No route generated');
                     }
                     
                     // Hide initial overlay
@@ -242,6 +506,7 @@
                     // Clear existing route
                     if (routeLayer) {
                         map.removeLayer(routeLayer);
+                        routeLayer = null;
                     }
                     
                     // Add route to map
@@ -258,17 +523,24 @@
                     routePath = routePoints;
                     
                     // Update UI
-                    updateStatus('Ready', 'green');
-                    updateStats(ways.length, calculateDistance(routePoints));
+                    updateStatus('CPP Complete', 'green');
+                    updateStats(ways.length, calculatePathDistance(routePoints));
                     document.getElementById('floating-actions').classList.remove('hidden');
                     
+                    hideLoading();
+                    
                 } catch (error) {
-                    alert('Error processing file: ' + error.message);
+                    hideLoading();
+                    alert('Error: ' + error.message);
                     console.error(error);
                     updateStatus('Error', 'red');
-                } finally {
-                    hideLoading();
                 }
+            };
+            
+            reader.onerror = function() {
+                hideLoading();
+                alert('Error reading file');
+                updateStatus('Error', 'red');
             };
             
             reader.readAsText(file);
@@ -281,7 +553,9 @@
                 return;
             }
             
-            let gpx = '<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="RouteMaster PRO">\n<trk>\n<trkseg>\n';
+            showLoading('Generating GPX...', 'Creating file');
+            
+            let gpx = '<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="RouteMaster PRO CPP">\n<trk>\n<trkseg>\n';
             
             for (let point of routePath) {
                 gpx += `<trkpt lat="${point[0]}" lon="${point[1]}"></trkpt>\n`;
@@ -293,9 +567,11 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'route.osm.gpx';
+            a.download = `route_cpp_${Date.now()}.gpx`;
             a.click();
             URL.revokeObjectURL(url);
+            
+            hideLoading();
         }
 
         // Reset app
@@ -307,26 +583,19 @@
             document.getElementById('floating-actions').classList.add('hidden');
             document.getElementById('overlay-initial').classList.remove('hidden');
             routePath = null;
-            osmData = null;
+            wayGraph = null;
+            nodeMap = null;
+            updateStatus('Idle', 'slate');
+            updateStats(0, 0);
         }
 
-        // DOM ready
+        // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             const dropZone = document.getElementById('dropZone');
             const fileInput = document.getElementById('fileInput');
-            const startLat = document.getElementById('startLat');
-            const startLon = document.getElementById('startLon');
 
-            // File input change handler
             fileInput.addEventListener('change', (e) => {
                 handleFileUpload(e.target.files);
-            });
-
-            // Optional: Use provided start coordinates if available
-            fileInput.addEventListener('change', (e) => {
-                if (startLat.value && startLon.value) {
-                    console.log('Start coordinates provided:', startLat.value, startLon.value);
-                }
             });
 
             // Drag & drop handlers
@@ -346,14 +615,9 @@
             });
 
             dropZone.addEventListener('drop', (e) => {
-                const files = e.dataTransfer.files;
-                if (files.length > 0) {
-                    handleFileUpload(files);
-                }
+                handleFileUpload(e.dataTransfer.files);
             }, false);
         });
     </script>
 </body>
 </html>
-
-
