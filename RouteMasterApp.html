@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RouteMaster PRO - OSM Route Generator</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        #map { height: 100vh; width: 100%; z-index: 1; }
+        .route-arrow { background: transparent !important; border: none !important; }
+        .dragover { background-color: #e0f2fe !important; border: 2px dashed #0284c7 !important; }
+        #overlay-loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; align-items: center; justify-content: center; flex-direction: column; color: white; }
+        #overlay-initial { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 999; display: flex; align-items: center; justify-content: center; }
+        .hidden { display: none !important; }
+        #floating-actions { position: fixed; bottom: 20px; right: 20px; z-index: 100; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div id="overlay-initial">
+        <div class="text-center p-8 bg-white rounded-lg shadow-xl max-w-md">
+            <h1 class="text-3xl font-bold mb-4">RouteMaster PRO</h1>
+            <p class="mb-6 text-gray-600">Upload an OSM XML file to generate an optimized route</p>
+            <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition">
+                <p class="text-lg mb-2">ðŸ“ Drag & Drop OSM File Here</p>
+                <p class="text-sm text-gray-500">or</p>
+                <input type="file" id="fileInput" accept=".osm,.xml" class="mt-4" onchange="handleFileUpload(event)">
+                <label for="fileInput" class="block mt-2 text-blue-600 cursor-pointer">Browse Files</label>
+            </div>
+        </div>
+    </div>
+    
+    <div id="overlay-loading" class="hidden">
+        <h2 id="loading-title" class="text-2xl font-bold mb-2">Processing...</h2>
+        <p id="loading-subtitle" class="text-lg">Please wait</p>
+    </div>
+    
+    <div id="floating-actions" class="hidden">
+        <div class="bg-white rounded-lg shadow-lg p-4 mb-4">
+            <div class="flex items-center gap-4 mb-4">
+                <div>
+                    <span id="status-dot" class="relative inline-flex rounded-full h-3 w-3 bg-slate-400"></span>
+                    <span id="status-text" class="text-[10px] font-bold text-slate-600 uppercase ml-2">Idle</span>
+                </div>
+                <div class="text-sm">
+                    <span id="stat-ways">0 Ways</span> | <span id="stat-dist">0.00 km</span>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="downloadGPX()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Download GPX</button>
+                <button onclick="resetApp()" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">Reset</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="routemaster_app.js"></script>
+</body>
+</html>
